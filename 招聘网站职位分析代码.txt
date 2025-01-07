@@ -1,0 +1,1031 @@
+import urllib.request
+from urllib.parse import *
+from bs4 import BeautifulSoup
+import string
+import random
+import os
+headers = [
+    "Mozilla/5.0 (Windows NT 6.1; Win64; rv:27.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:27.0) Gecko/20100101 Firfox/27.0"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:10.0) Gecko/20100101 Firfox/10.0"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/21.0.1180.110 Safari/537.36"
+    "Mozilla/5.0 (X11; Ubuntu; Linux i686 rv:10.0) Gecko/20100101 Firfox/27.0"
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/34.0.1838.2 Safari/537.36"
+    "Mozilla/5.0 (X11; Ubuntu; Linux i686 rv:27.0) Gecko/20100101 Firfox/27.0"
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
+    ]
+def get_content(url, headers):
+    #@url：需要登录的网址
+    #@headers：模拟的登陆的终端
+    #*********************模拟登陆获取网址********************
+
+    random_header = random.choice(headers)
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", random_header)
+    req.add_header("Host", "192.168.1.150:40000")
+    try:
+        html = urllib.request.urlopen(req)
+        contents = html.read()
+        if isinstance(contents, bytes):
+            contents = contents.decode('utf-8')
+        else:
+            print('service mysql restart')
+        return (contents)
+    except Exception as e:
+        print(e)
+def get_links_from(page):
+    #@page：表示第几页信息
+    #@urls：所有列表的超链接，即子页网址
+    #****************此网站需要模拟登陆**********************
+    #返回全部子网页地址
+    urls = []
+    for i in range(1,page):
+        url='http://192.168.1.150:40000/wuyou/{0}'.format(i)
+        url = quote(url, safe=string.printable)
+        info = get_content(url, headers)
+        soup = BeautifulSoup(info, "lxml")
+        link_urls = soup.select('div.dw_table div.el span.t2 a')
+        for url in link_urls:
+            oneurl="http://192.168.1.150:40000"+url.get('href')
+            urls.append(oneurl)
+    # print(urls)
+    return (urls)
+def get_recuite_info(page):
+    #获取网页信息
+    urls = get_links_from(page)
+    path='/data/zhaopin/'
+    if os.path.exists(path)==False:
+        os.makedirs(path)
+    for url in urls:
+        print(url)
+        file=url.split('/')[-1]
+        print(file)
+        str=url.split('/')[2].split('.')[0]
+        html = get_content(url, headers)
+        if html!=None and file!='':
+            with open(path+file,'w') as f:
+                f.write(html)
+#*********************获取信息***************************
+if __name__ == '__main__':
+get_recuite_info(20)
+使用BeautifulSoup清洗职位信息网页：
+# -*- coding: utf-8 -*-
+from bs4 import BeautifulSoup
+import pandas as pd
+import os
+
+def get_html_info(html):
+    '''''
+    *****************获取网页的有用信息并保存成字典形式****************
+    '''
+    try:
+        soup = BeautifulSoup(html, "lxml")  # 设置解析器为“lxml”
+        occ_name = soup.select('div.fixed-inner-box h1')[0]
+        com_name = soup.select('div.fixed-inner-box h2 ')[0]
+        welfare = soup.select('div.welfare-tab-box')[0]
+        wages = soup.select('div.terminalpage-left strong')[0]
+        date = soup.select('div.terminalpage-left strong')[2]
+        exper = soup.select('div.terminalpage-left strong')[4]
+        num = soup.select('div.terminalpage-left strong')[6]
+        area = soup.select('div.terminalpage-left strong')[1]
+        nature = soup.select('div.terminalpage-left strong')[3]
+        Edu = soup.select('div.terminalpage-left strong')[5]
+        cate = soup.select('div.terminalpage-left strong')[7]
+        com_scale = soup.select('ul.terminal-ul.clearfix li strong')[8]
+        com_nature = soup.select('ul.terminal-ul.clearfix li strong')[9]
+        com_cate = soup.select('ul.terminal-ul.clearfix li strong')[10]
+        com_url = soup.select('div.fixed-inner-box h2 a')[0]
+        com_address = soup.select('ul.terminal-ul.clearfix li strong')[-1]
+        job_descritions1 = soup.select('div.tab-inner-cont')[0]
+        job_descritions=job_descritions1.select('p')[:-1]
+        data = {
+            "工作名称": occ_name.text.strip(),
+            "公司名称": com_name.text,
+            "公司网址": com_url.get('href'),
+            "福利": welfare.text.strip(),
+            "月工资": wages.text.strip(),
+            "发布日期": date.text.strip(),
+            "经验": exper.text.strip(),
+            "人数": num.text.strip(),
+            "工作地点": area.text.strip(),
+            "工作性质": nature.text.strip(),
+            "最低学历": Edu.text.strip(),
+            "职位类别": cate.text.strip(),
+            "公司规模": com_scale.text.strip(),
+            "公司性质": com_nature.text.strip(),
+            "公司行业": com_cate.text.strip(),
+            "公司地址": com_address.text.strip(),
+            "岗位描述": [job_descrition.text.strip() for job_descrition in job_descritions],
+
+        }
+        # print(data)
+        return (data)
+    except Exception:
+        pass
+
+# 将全部信息保存成DataFrame形式，去除无用信息
+def get_htmls_all_info(path):
+    df = pd.DataFrame({
+
+        "工作名称": [],
+        "公司名称": [],
+        "公司网址": [],
+        "福利": [],
+        "月工资": [],
+        "发布日期": [],
+        "经验": [],
+        "人数": [],
+        "工作地点": [],
+        "工作性质": [],
+        "最低学历": [],
+        "职位类别": [],
+        "公司规模": [],
+        "公司性质": [],
+        "公司行业": [],
+        "公司地址": [],
+        "岗位描述": [],
+
+    })
+    dirs = os.listdir(path)
+    for dir in dirs:
+        #print(dir)
+        if dir.find('swp'):
+            dir=dir.strip('.'and '.swp')
+        p = os.path.join(path, dir)
+        html = open(p).read()
+        data = get_html_info(html)
+        print(data)
+        df = df.append(data, ignore_index=True)
+    return df
+
+if __name__ == '__main__':
+    path='/data/python_pj2/jobs.zhaopin.com'
+    df=get_htmls_all_info(path)
+    df.to_csv('/data/python_pj2/bigdata', index=False)
+print(df)
+
+
+使用PySpark对职位数据进行分析
+RDD1 = sc.textFile("/bigdata")
+RDD1.count()#使用textFile()方法读取HDFS上的bigdata文件，赋值给RDD1并统计文件内容有多少行
+RDD2=RDD1.map(lambda line:line.split(","))#使用map函数处理每一项数据，用lambda语句创建匿名函数传入line参数，在匿名函数中，line.split(“,”)表示按照逗号分隔获取每一个字段
+from pyspark.sql import Row
+zhilian_Rows = RDD2.map(lambda p:
+Row(
+num_people=p[0],
+Company_name=p[1],
+Company_address=p[2],
+Company_Type=p[3],
+Company_website=p[4],
+Industry=p[5],
+Company_Size=p[6],
+Release_date=p[7],
+Job_name=p[8],
+work_place=p[9],
+Nature_of_the_work=p[10],
+Minimum_education=p[11],
+Monthly_salary=p[12],
+Welfare=p[13],
+Experience=p[14],
+Job_Categories=p[15]# 导入row模块，通过RDD2创建DataFrame，定义DataFrame的每一个字段名与数据类型
+)
+)
+from pyspark.sql import SQLContext
+sqlContext = SQLContext(sc)
+
+zhilian_df = sqlContext.createDataFrame(zhilian_Rows)
+zhilian_df.printSchema()
+#创建了zhilian_Rows之后，使用sqlContext.createDataFrame()方法写入zhilian_Rows数据，创建DataFrame，然后使用.printSchema()方法查看DataFrames的Schema
+zhilian_df.show(5)# 接下来，我们可以使用.show()方法来查看前5行数据
+df=zhilian_df.alias("df")
+df.show(5)# 我们也可以使用.alias()方法来为DadaFrame创建别名
+df.select("Company_Type").groupby("Company_Type").count().show()
+#使用DataFrame统计公司性质及数量
+sqlContext.registerDataFrameAsTable(df, "zhilian_table")#我们之前创建DataFrame，下面我们使用registerTempTable方法将df转换为zhilian_table表
+sqlContext.sql("select count(*) counts from zhilian_table").show()#接下来，我们可以使用sqlContext.sql()输入sql语句，使用select关键字查询文件内容行数，并使用from关键字指定要查询的表，最后使用show()方法显示查询结果
+sqlContext.sq
+Company_Type_df=sqlContext.sql("""
+select distinct
+z.Experience,count(*) counts 
+from 
+zhilian_table z 
+group by Experience
+""")
+Company_Type_df.show()
+#使用PySpark SQL统计经验要求及数量
+Company_Type_df=sqlContext.sql("""
+select distinct
+z.Company_Size,count(*) counts 
+from 
+zhilian_table z 
+group by Company_Size
+""")
+Company_Type_df.show()
+#使用PySpark SQL统计公司规模及数量
+Company_Type_df=sqlContext.sql("""
+select distinct
+z.Minimum_education,count(*) counts 
+from 
+zhilian_table z 
+group by Minimum_education
+""")
+Company_Type_df.show()
+#使用PySpark SQL统计最低学历及数量
+Company_Type_df=sqlContext.sql("""
+select distinct
+z.work_place,count(*) counts 
+from 
+zhilian_table z 
+group by work_place
+""")
+Company_Type_df.show()
+#使用PySpark SQL统计工作地区及数量
+Company_Type_df=sqlContext.sql("""
+select distinct
+z.Job_Categories,count(*) counts 
+from 
+zhilian_table z 
+group by Job_Categories
+""")
+Company_Type_df.show()
+#使用PySpark SQL统计职业类别及数量
+
+
+对招聘职位信息进行探索分析
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.font_manager as fm
+
+fontPath ="/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+font = fm.FontProperties(fname=fontPath, size=10)
+
+
+data=pd.read_csv('/data/python_pj3/bigdata',)
+print(data.shape,data.columns)
+data.loc[(data.经验=='3年以上'),'经验']='3-5年'
+
+#公司规模分布情况
+plt.figure(figsize=(12,10))
+plt.subplot2grid((2,3),(0,0))
+a=data['公司规模'].value_counts().plot(kind='barh',title='公司规模分布情况',color='pink')
+a.xaxis.get_label().set_fontproperties(font)
+a.yaxis.get_label().set_fontproperties(font)
+a.legend(loc='best',prop=font)
+for label in ([a.title]+a.get_xticklabels()+a.get_yticklabels()):
+    label.set_fontproperties(font)
+
+
+#公司性质分布情况
+plt.subplot2grid((2,3),(0,1))
+b=data['公司性质'].value_counts().plot(kind='barh',title='公司性质分布情况',color='red')
+b.xaxis.get_label().set_fontproperties(font)
+b.yaxis.get_label().set_fontproperties(font)
+b.legend(loc='best',prop=font)
+for label in ([b.title]+b.get_xticklabels()+b.get_yticklabels()):
+    label.set_fontproperties(font)
+
+
+#经验分布情况
+# plt.subplot2grid((2,2),(1,0),colspan=2)
+plt.subplot2grid((2,3),(0,2))
+c=data['经验'].value_counts().plot(kind='barh',title='经验分布情况',color='lightskyblue')
+c.xaxis.get_label().set_fontproperties(font)
+c.yaxis.get_label().set_fontproperties(font)
+c.legend(loc='best',prop=font)
+for label in ([c.title]+c.get_xticklabels()+c.get_yticklabels()):
+    label.set_fontproperties(font)
+
+
+#公司行业分布情况
+plt.subplot2grid((2,3),(1,0))
+d=data['公司行业'].value_counts().sort_values(ascending=False).head(10).plot(kind='barh',title='公司行业分布情况',color='yellowgreen')
+d.xaxis.get_label().set_fontproperties(font)
+d.yaxis.get_label().set_fontproperties(font)
+d.legend(loc='best',prop=font)
+for label in ([d.title]+d.get_xticklabels()+d.get_yticklabels()):
+    label.set_fontproperties(font)
+
+
+#职位类别分布情况
+plt.subplot2grid((2,3),(1,1))
+d=data['职位类别'].value_counts().sort_values(ascending=False).head(10).plot(kind='barh',title='职位类别分布情况',color='green')
+d.xaxis.get_label().set_fontproperties(font)
+d.yaxis.get_label().set_fontproperties(font)
+d.legend(loc='best',prop=font)
+for label in ([d.title]+d.get_xticklabels()+d.get_yticklabels()):
+    label.set_fontproperties(font)
+
+
+#工作地点分布情况
+plt.subplot2grid((2,3),(1,2))
+d=data['工作地点'].str.split('-',expand=True)[0].value_counts().plot(kind='bar',title='工作地点分布情况',color='yellow',label='工作地点')
+d.xaxis.get_label().set_fontproperties(font)
+d.yaxis.get_label().set_fontproperties(font)
+d.legend(loc='best',prop=font)
+# print(d.get_legend_handles_labels())
+for label in ([d.title]+d.get_xticklabels()+d.get_yticklabels()):
+    label.set_fontproperties(font)
+plt.show()
+
+#月工资与其他因素的关系
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.font_manager as fm
+fontPath ="/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+font = fm.FontProperties(fname=fontPath, size=10)
+data=pd.read_csv('/data/python_pj3/bigdata')
+print(data.shape)
+print(data.columns)
+# print([data.职位类别.value_counts().index if data.职位类别.value_counts()<10==False:])
+data.loc[((data.职位类别=='客户代表')|(data.职位类别=='电话销售')|(data.职位类别=='大客户销售代表')),'职位类别']='销售代表'
+月工资=data['月工资'].str.strip('元/月').str.split('-',expand=True)
+月工资.columns=['月工资_min','月工资_max']
+data['月工资_min']=月工资['月工资_min']
+data['月工资_max']=月工资['月工资_max']
+
+data.loc[(data.月工资_min=='面议'),'月工资_min']=0
+data.loc[(data.月工资_min=='1000元/月以下' ),'月工资_min']=1
+data.loc[(data.月工资_min=='100000元/月以上'),'月工资_min']=7
+data.loc[(data.月工资_max.isnull()),'月工资_max']=0
+print('****************************************************')
+data.月工资_min=data.月工资_min.astype(int)
+data.月工资_max=data.月工资_max.astype(int)
+月工资_mean=(data.月工资_min+data.月工资_max)/2
+data.loc[((data.月工资_min==0) & (data.月工资_max==0) & (data.月工资.notnull()) ),'月工资']=0
+data.loc[((data.月工资_min==1) & (data.月工资_max==0) & (data.月工资.notnull()) ),'月工资']=1
+data.loc[((data.月工资_min<6000) & (data.月工资_min>8)),'月工资'] = 1
+data.loc[((((data.月工资_min>=6000) & (data.月工资_max<=8000)) | ((6000<月工资_mean)&(月工资_mean<8000))) & (data.月工资.notnull())),'月工资'] = 2
+data.loc[((((data.月工资_min>=8000) & (data.月工资_max<=10000)) | ((8000<=月工资_mean)&(月工资_mean<10000))) & (data.月工资.notnull()) ),'月工资']=3
+data.loc[((((data.月工资_min>=10000) & (data.月工资_max<=20000)) | ((10000<=月工资_mean)&(月工资_mean<20000))) & (data.月工资.notnull())),'月工资']=4
+# data.loc[((data.月工资_min>=15000) & (data.月工资_max<=20000) & (data.月工资.notnull()) ),'月工资']=5
+data.loc[((((data.月工资_min>=20000) & (data.月工资_max<=30000)) | ((20000<=月工资_mean)&(月工资_mean<30000))) & (data.月工资.notnull()) ),'月工资']=5
+data.loc[((((data.月工资_min>=30000) & (data.月工资_max<=50000)) | ((30000<=月工资_mean)&(月工资_mean<50000))) & (data.月工资.notnull())),'月工资']=6
+data.loc[(((data.月工资_min>=50000) | (50000<=月工资_mean)) & (data.月工资.notnull()) ),'月工资']=7
+data.loc[((data.月工资_min==7) & (data.月工资_max==0) & (data.月工资.notnull()) ),'月工资']=7
+print(data.月工资.value_counts(sort=False))
+
+#月工资分布情况
+fig=plt.figure()
+fracs=data.月工资.value_counts(sort=False)
+labels=['面议','6000元/月以下','6000-8000元/月','8000-10000元/月','10000-20000元/月','20000-30000元/月','30000-50000元/月','500000元/月以上 ']
+colors = ['purple','yellowgreen','lightskyblue','pink','coral','orange','green','lightyellow']
+explode=[0,0,0,0,0.05,0,0,0]
+patchs,l_text,p_text=plt.pie(x=fracs,explode=explode, labels=labels,colors=colors, autopct='%3.1f %%',
+        shadow=True, labeldistance=1.1, startangle=0, pctdistance=0.6)
+plt.title('月工资分布情况',fontproperties=font)
+for t in (l_text+p_text):
+    t.set_fontproperties(font)
+#各经验等级的月工资情况
+data.loc[(data.经验=='3年以上'),'经验']='3-5年'
+print("****************************************************")
+df=pd.DataFrame([data.经验[data.月工资==i].value_counts().rename(i) for i in range(8)])
+print(df)
+df.plot(kind='bar',colors=['yellowgreen','lightskyblue','pink','coral','orange','green','palegreen'])
+plt.legend(loc='best',prop=font)
+plt.xticks(df.index,labels,rotation=15,fontproperties=font)
+plt.title('各经验等级的工资分布情况',fontproperties=font)
+plt.xlabel('工资等级',fontproperties=font)
+plt.ylabel('公司数量',fontproperties=font)
+#月工资与学历
+print("****************************************************")
+df=pd.DataFrame([data.最低学历[data.月工资==i].value_counts().rename(i) for i in range(8)])
+print(df)
+df.plot(kind='bar',stacked=True,colors=colors)
+plt.legend(loc='best',prop=font)
+plt.xticks(df.index,labels,rotation=15,fontproperties=font)
+plt.title('各学历等级的工资分布情况',fontproperties=font)
+plt.xlabel('工资等级',fontproperties=font)
+plt.ylabel('公司数量',fontproperties=font)
+#月工资与工作地点
+print("****************************************************")
+df=pd.DataFrame([data.工作地点.str.split('-',expand=True)[0][data.月工资==i].value_counts().rename(i) for i in range(8)]).T
+print(df)
+colors=['burlywood','yellowgreen','lightskyblue','pink','coral','orange','plum','oldlace']
+d=df.plot(kind='bar',stacked=True,colors=colors)
+plt.legend(loc='best',prop=font,labels=labels)
+print(d.get_legend_handles_labels())
+plt.xticks([i for i in range(len(df.index))],df.index,rotation=15,fontproperties=font)
+plt.title('工作地点的工资分布情况',fontproperties=font)
+plt.xlabel('工资等级',fontproperties=font)
+plt.ylabel('公司数量',fontproperties=font)
+print(df.values)
+plt.show()
+
+
+
+#公司规模与经验和公司规模与最低学历的关系
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.font_manager as fm
+fontPath ="/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+font = fm.FontProperties(fname=fontPath, size=10)
+data=pd.read_csv('/data/python_pj3/bigdata')
+print(data.shape)
+print(data.columns)
+# print([data.职位类别.value_counts().index if data.职位类别.value_counts()<10==False:])
+data.loc[((data.职位类别=='客户代表')|(data.职位类别=='电话销售')|(data.职位类别=='大客户销售代表')),'职位类别']='销售代表'
+公司规模 =data['公司规模'].str.strip('人').str.split('-',expand=True)
+
+公司规模.columns=['公司规模_min','公司规模_max']
+data['公司规模_min']=公司规模['公司规模_min']
+data['公司规模_max']=公司规模['公司规模_max']
+
+data.loc[(data.公司规模_min=='保密'),'公司规模_min']=0
+data.loc[(data.公司规模_min=='20人以下' ),'公司规模_min']=1
+data.loc[(data.公司规模_min=='10000人以上'),'公司规模_min']=6
+data.loc[(data.公司规模_max.isnull()),'公司规模_max']=0
+data.loc[(data.公司规模_min.isnull()),'公司规模_min']=0
+print(data.公司规模_min)
+print('****************************************************')
+data.公司规模_min=data.公司规模_min.astype(int)
+data.公司规模_max=data.公司规模_max.astype(int)
+公司规模_mean=(data.公司规模_min+data.公司规模_max)/2
+data.loc[((data.公司规模_min==0) & (data.公司规模_max==0) & (data.公司规模.notnull()) ),'公司规模']=0
+data.loc[((data.公司规模_min==1) & (data.公司规模_max==0) & (data.公司规模.notnull()) ),'公司规模']=1
+data.loc[((data.公司规模_min<20) & (data.公司规模_min>1)),'公司规模'] = 1
+data.loc[((((data.公司规模_min>=20) & (data.公司规模_max<=99)) | ((20<公司规模_mean)&(公司规模_mean<99))) & (data.公司规模.notnull())),'公司规模'] = 2
+data.loc[((((data.公司规模_min>=100) & (data.公司规模_max<=499)) | ((100<=公司规模_mean)&(公司规模_mean<499))) & (data.公司规模.notnull()) ),'公司规模']=3
+data.loc[((((data.公司规模_min>=500) & (data.公司规模_max<=999)) | ((500<=公司规模_mean)&(公司规模_mean<999))) & (data.公司规模.notnull())),'公司规模']=4
+data.loc[((((data.公司规模_min>=1000) & (data.公司规模_max<=9999)) | ((1000<=公司规模_mean)&(公司规模_mean<9999))) & (data.公司规模.notnull()) ),'公司规模']=5
+data.loc[(((data.公司规模_min>=10000) | (10000<=公司规模_mean)) & (data.公司规模.notnull()) ),'公司规模']=6
+data.loc[((data.公司规模_min==7) & (data.公司规模_max==0) & (data.公司规模.notnull()) ),'公司规模']=6
+print(data.公司规模.value_counts(sort=False))
+
+colors=['purple','yellowgreen','pink','coral','orange','green','lightyellow']
+labels=['保密','20人以下','20-99人','100-499人','500-999人','1000-9999人','10000人以上']
+data.loc[(data.经验=='3年以上'),'经验']='3-5年'
+
+
+print("****************************************************")
+df=pd.DataFrame([data.经验[data.公司规模==i].value_counts().rename(i) for i in range(7)])
+print(df)
+df.plot(kind='bar',stacked=True,colors=colors)
+plt.legend(loc='best',prop=font)
+plt.xticks(df.index,labels,rotation=15,fontproperties=font)
+plt.title('公司规模与工作经验的关系',fontproperties=font)
+plt.xlabel('公司规模',fontproperties=font)
+plt.ylabel('公司数量',fontproperties=font)
+
+print("****************************************************")
+df=pd.DataFrame([data.最低学历[data.公司规模==i].value_counts().rename(i) for i in range(7)])
+print(df)
+colors=['burlywood','yellowgreen','lightskyblue','pink','coral','orange','plum','blue']
+df.plot(kind='bar',stacked=True,colors=colors)
+plt.legend(loc='best',prop=font)
+plt.xticks(df.index,labels,rotation=15,fontproperties=font)
+plt.title('公司规模与最低学历的关系',fontproperties=font)
+plt.xlabel('公司规模',fontproperties=font)
+plt.ylabel('公司数量',fontproperties=font)
+print(df.values)
+plt.show()
+
+ 
+ 
+使用结巴分词对岗位描述进行分词并将关键词统计
+
+import pandas as pd
+import re
+import numpy as np
+import jieba
+import jieba.analyse
+import pymysql
+from sqlalchemy import create_engine
+pymysql.install_as_MySQLdb()
+
+
+#加载数据
+data=pd.read_csv('/data/python_pj4/bigdata',header=None,names=[ '人数', '公司名称', '公司地址', '公司性质', '公司网址', '公司行业', '公司规模',
+       '发布日期', '岗位描述', '工作名称', '工作地点', '工作性质', '最低学历', '月工资', '福利', '经验', '网址',
+       '职位类别'])
+data=data[1:]
+
+# 使用pandas中的方法,取出岗位描述列中符合的内容
+job_des=data.岗位描述.str.strip("[]").str.replace(',','').str.replace("'","").str.replace(r'\\xa0','').str.replace(' '*3 or ' '*4,'|').str.split('|',expand=True)[0]
+# print(job_des)
+
+#jieba分词，并统计词频
+zidian={}
+r1=re.compile(r'\w') #使用正则表达式,筛选[A-Za-z0-9_]
+r2=re.compile(r'[^\d]') #使用正则表达式,筛选[0-9_]
+r4=re.compile(r'[^_]')
+r3=re.compile(r'[\u4e00-\u9fa5]') #使用正则表达式,筛选纯中文
+stopkeyword=[line.strip() for line in open('/home/zhangyu/stopword').readlines()] #加载停用词
+bogs=[] #用于存储长的英文语句
+for i in job_des:
+    seg_list = jieba.cut(i)
+    # print('Dafault Mode:', ' '.join(seg_list))
+    for word in seg_list:
+        if word not in stopkeyword and r1.match(word) and r2.match(word)and r3.match(word)==None and r4.match(word): #筛选语句中的英文
+            word=word.lower() #小写化所有词
+            if len(word)>=10:
+                bogs.append(word)
+            elif len(word)!=1 or word in ['c','r']:
+                #统计词频
+                if word in zidian:
+                    zidian[word]+=1
+                else:
+                    zidian[word]=1
+
+#将字典的值逆序
+zidian=sorted(zidian.items(),key=lambda item:item[1],reverse=True)
+zidian=pd.DataFrame(zidian,columns=['skill_name','num'])
+zidian.loc[(zidian.skill_name=='r'),'skill_name']="R"
+zidian.loc[(zidian.skill_name=='c'),'skill_name']="C"
+df=zidian[zidian.num>70]
+
+#用于分割长语句中的关键词
+def cut(sentences,words):
+    itr=[]
+    for st in sentences:
+        for word in words:
+            if st.find(word)!=-1:
+                itr.append(word)
+                cut(st.split(word),words)
+    return itr
+
+
+#将分割词的词频累计到‘zidian’中
+word_bogs=cut(bogs,df.skill_name)
+for word_bog in word_bogs:
+    if word_bog in list(zidian.skill_name):
+        zidian.loc[zidian.skill_name==word_bog,'num']+=1
+# zidian.to_csv('/data/zhilian/job_des')
+print(zidian)
+
+#将zidian中数据导入到mysql数据库中
+conn=create_engine('mysql+mysqldb://root:strongs@localhost:3306/zhilian?charset=utf8')
+pd.io.sql.to_sql(zidian,name='job_des',con=conn,schema='zhilian',if_exists='append',index=False) 
+
+利用Django Echarts将职位分析结果进行可视化
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'zhilian',
+        'USER': 'root',
+        'PASSWORD': 'strongs',
+        'HOST': 'localhost',
+        'PORT': '3306',
+    }
+}# Django项目建成后, 默认设置了使用SQLite数据库，把DATABASES修改MySQL的数据库设置, 在PyCharm打开word/word/settings.py 中可以查看和修改数据库设置
+from django.conf.urls import url
+from web import views
+
+urlpatterns = [
+    url(r'^word$', views.word),
+    url(r'^word_data/$', views.word_data),
+]
+#url设置
+from web import models
+import json
+from django.db import connection
+import pymysql
+from django.shortcuts import render, HttpResponse
+
+def word(request):
+    return render(request, 'word_cloud.html')
+def word_data(request):
+    # select
+    # conn = pymysql.connect(host='localhost', user='root', passwd='123456', db='zhilian', port=3306, charset='utf8')
+    cur = connection.cursor()
+    cur.execute('select * from job_des order by num desc ;')
+    data_obj = cur.fetchall()
+    data_list = []
+    for i in data_obj:
+        data_list.append({'name': i[0], 'value': i[1]})
+    cur.close()
+    connection.close()
+return HttpResponse(json.dumps(data_list))
+#views函数
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]#csrf设置
+建立LDA模型对职位描述进行相似度的计算
+#-*- coding:utf-8
+
+'''
+
+preprocess.py
+这个文件的作用是做文档预处理，
+讲每篇文档，生成相应的token_list
+只需执行最后documents_pre_process函数即可。
+
+'''
+
+from nltk.tokenize import WordPunctTokenizer
+import traceback
+import jieba
+from nltk.corpus import stopwords
+from nltk.stem.lancaster import LancasterStemmer
+from collections import defaultdict
+import re
+
+# 分词 - 英文
+def tokenize(document):
+    try:
+
+        token_list = WordPunctTokenizer().tokenize(document)
+
+        #print("[INFO]: tokenize is finished!")
+        return token_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 分词 - 中文
+def tokenize_chinese(document):
+    try:
+
+        token_list = jieba.cut( document, cut_all=False )
+
+        #print("[INFO]: tokenize_chinese is finished!")
+        return token_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 去除停用词 -英文
+def filtered_stopwords_en(token_list):
+    try:
+
+        token_list_without_stopwords = [ word for word in token_list if word not in stopwords.words("english")]
+
+        #print("[INFO]: filtered_words is finished!")
+        return token_list_without_stopwords
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 去除停用词 - 中文
+def filtered_stopwords_ch(token_list,stopwords):
+    try:
+
+        token_list_without_stopwords = [word for word in token_list if word not in stopwords]
+
+        # print("[INFO]: filtered_words is finished!")
+        return token_list_without_stopwords
+    except Exception as e:
+        print(traceback.print_exc())
+
+
+# 去除标点
+def filtered_punctuations(token_list):
+    try:
+
+        punctuations = ['', '\n', '\t', ',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%','xa0','，']
+        token_list_without_punctuations = [word for word in token_list if word not in punctuations]
+
+        #print("[INFO]: filtered_punctuations is finished!")
+        return token_list_without_punctuations
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 过滤出中 - 英文
+def filtered_chinese_english_words(token_list):
+    try:
+        r1 = re.compile(r'\w')  # 使用正则表达式,筛选[A-Za-z0-9_]
+        r2 = re.compile(r'[^\d]')  # 使用正则表达式,筛选[0-9_]
+        r4 = re.compile(r'[^_]')
+        r3 = re.compile(r'[\u4e00-\u9fa5]')
+        token_list = [word.lower() for word in token_list if (r3.match(word) != None) or (r3.match(word) == None and r1.match(word) and r2.match(word) and r4.match(word))]
+        # print("[INFO]: filtered_punctuations is finished!")
+        return token_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 词干化 -英文
+def stemming( filterd_token_list ):
+    try:
+
+        st = LancasterStemmer()
+        stemming_token_list = [ st.stem(word) for word in filterd_token_list ]
+
+        #print("[INFO]: stemming is finished")
+        return stemming_token_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 去除低频单词
+def low_frequence_filter( token_list ):
+    try:
+
+        word_counter = defaultdict(int)
+        for word in token_list:
+            word_counter[word] += 1
+
+        threshold = 0
+        token_list_without_low_frequence = [ word
+                                             for word in token_list
+                                             if word_counter[word] > threshold]
+
+        #print "[INFO]: low_frequence_filter is finished!"
+        return token_list_without_low_frequence
+    except Exception as e:
+        print(traceback.print_exc())
+
+"""
+功能：预处理
+@ document: 文档
+@ token_list: 预处理之后文档对应的单词列表
+"""
+def pre_process( document,ch_stopwords ):
+    try:
+
+        # token_list = tokenize(document)
+        token_list = tokenize_chinese(document)
+        token_list=filtered_chinese_english_words(token_list )
+        token_list = filtered_stopwords_ch(token_list, ch_stopwords)
+        token_list= filtered_punctuations(token_list)
+
+        #print("[INFO]: pre_process is finished!")
+        return token_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+"""
+功能：预处理
+@ document: 文档集合
+@ token_list: 预处理之后文档集合对应的单词列表
+"""
+def documents_pre_process( documents,ch_stopwords ):
+    try:
+
+        documents_token_list = []
+        for document in documents:
+            token_list = pre_process(document,ch_stopwords)
+            documents_token_list.append(token_list)
+
+        print("[INFO]:documents_pre_process is finished!")
+        return documents_token_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+#-----------------------------------------------------------------------
+def test_pre_process(documents,ch_stopwords):
+
+    # documents = ["he,he,he,we are happy!",
+    #              "he,he,we are happy!",
+    #              "you work!"]
+    documents_token_list = []
+    for document in documents:
+        token_list = pre_process(document,ch_stopwords)
+        documents_token_list.append(token_list)
+
+    for token_list in documents_token_list:
+        print(token_list)
+
+
+# test_pre_process()
+import pandas as pd
+INPUT_PATH = "/data/python_pj6/bigdata"
+ch_stopkeyword=[line.strip() for line in open('/data/python_pj6/stopword').readlines()] #加载停用词
+data=pd.read_csv(INPUT_PATH)
+test_pre_process(data.岗位描述,ch_stopkeyword)
+#-*- coding:utf-8
+
+'''
+
+lda_model.py
+这个文件的作用是lda模型的训练
+根据预处理的结果，训练lda模型
+
+'''
+
+from pre_process import documents_pre_process
+from gensim import corpora, models, similarities
+import traceback
+
+# 训练tf_idf模型
+def tf_idf_trainning(documents_token_list):
+    try:
+
+        # 将所有文章的token_list映射为 vsm空间
+        dictionary = corpora.Dictionary(documents_token_list)
+
+        # 每篇document在vsm上的tf表示
+        corpus_tf = [ dictionary.doc2bow(token_list) for token_list in documents_token_list ]
+
+        # 用corpus_tf作为特征，训练tf_idf_model
+        tf_idf_model = models.TfidfModel(corpus_tf)
+
+        # 每篇document在vsm上的tf-idf表示
+        corpus_tfidf = tf_idf_model[corpus_tf]
+
+        #print "[INFO]: tf_idf_trainning is finished!"
+        return dictionary, corpus_tf, corpus_tfidf
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+# 训练lda模型
+def lda_trainning( dictionary, corpus_tfidf, K ):
+    try:
+
+        # 用corpus_tfidf作为特征，训练lda_model
+        lda_model = models.LdaModel( corpus_tfidf, id2word=dictionary, num_topics = K )
+
+        # 每篇document在K维空间上表示
+        corpus_lda = lda_model[corpus_tfidf]
+
+        #print "[INFO]: lda_trainning is finished!"
+        return lda_model, corpus_lda
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+'''
+功能:根据文档来训练一个lda模型，以及文档的lda表示
+    训练lda模型的用处是来了query之后，用lda模型将queru映射为query_lda
+@documents:原始文档raw material
+@K:number of topics
+@lda_model:训练之后的lda_model
+@corpus_lda:语料的lda表示
+'''
+def get_lda_model( documents, K , stopkeyword):
+    try:
+
+        # 文档预处理
+        documents_token_list = documents_pre_process( documents, stopkeyword)
+        # print(documents_token_list)
+
+        # 获取文档的字典vsm空间,文档vsm_tf表示,文档vsm_tfidf表示
+        dict, corpus_tf, corpus_tfidf = tf_idf_trainning( documents_token_list)
+        # print(corpus_tfidf)
+
+        # 获取lda模型,以及文档vsm_lda表示
+        lda_model, corpus_lda = lda_trainning( dict, corpus_tfidf, K )
+
+
+        print("[INFO]:get_lda_model is finished!")
+        return lda_model, corpus_lda, dict, corpus_tf, corpus_tfidf
+
+    except Exception as e:
+        print(traceback.print_exc())
+#-*- coding:utf-8
+
+'''
+similarity.py
+这个文件的作用是训练后的的lda模型，对语料进行相似度的计算
+
+'''
+
+from gensim import corpora, models, similarities
+import traceback
+
+'''
+这个函数没有用到
+'''
+# 基于lda模型的相似度计算
+def lda_similarity( query_token_list, dictionary, corpus_tf, lda_model ):
+    try:
+
+        # 建立索引
+        index = similarities.MatrixSimilarity( lda_model[corpus_tf] )
+
+        # 在dictionary建立query的vsm_tf表示
+        query_bow = dictionary.doc2bow( query_token_list )
+
+        # 查询在K维空间的表示
+        query_lda = lda_model[query_bow]
+
+        # 计算相似度
+        # simi保存的是 query_lda和corpus_lda的相似度
+        simi = index[query_lda]
+        query_simi_list = [ item for _, item in enumerate(simi) ]
+        return query_simi_list
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+'''
+功能：语聊基于lda模型的相似度计算
+@ corpus_tf:语聊的vsm_tf表示
+@ lda_model:训练好的lda模型
+'''
+def lda_similarity_corpus( corpus_tf, lda_model ):
+    try:
+
+        # 语料库相似度矩阵
+        lda_similarity_matrix = []
+
+        # 建立索引
+        index = similarities.MatrixSimilarity( lda_model[corpus_tf] )
+
+        # 计算相似度
+        for query_bow in corpus_tf:
+
+            # K维空间表示
+            query_lda = lda_model[query_bow]
+
+            # 计算相似度
+            simi = index[query_lda]
+
+            # 保存
+            query_simi_list = [item for _, item in enumerate(simi)]
+            lda_similarity_matrix.append(query_simi_list)
+
+        print("[INFO]:lda_similarity_corpus is finished!")
+        return lda_similarity_matrix
+
+    except Exception as e:
+        print(traceback.print_exc())
+#-*- coding:utf-8
+'''
+save_result.py
+这个文件的作用是保存结果
+'''
+
+
+import traceback
+
+def save_similarity_matrix(matrix, output_path):
+    try:
+
+        outfile = open( output_path, "w" )
+
+        for row_list in matrix:
+            line = ""
+            for value in row_list:
+                line += ( str(value) + ',' )
+            outfile.write(line + '\n')
+
+        outfile.close()
+        print("[INFO]:save_similarity_matrix is finished!")
+    except Exception as e:
+        print(traceback.print_exc())
+#-*- coding:utf-8
+
+'''
+train_lda_main.py
+这个文件的作用是汇总前面各部分代码，对文档进行基于lda的相似度计算
+
+'''
+
+from lda_model import get_lda_model
+from similarity import lda_similarity_corpus
+from save_result import save_similarity_matrix
+import traceback
+import pandas as pd
+
+INPUT_PATH = "/data/python_pj6/bigdata"
+OUTPUT_PATH = "/data/python_pj6/lda_simi_matrix.txt"
+# data=pd.read_csv(INPUT_PATH)
+# print(data.岗位描述)
+# print(data.info())
+
+def train(documents,stopword):
+    try:
+
+        # 语料
+        # documents = ["Shipment of gold damaged in a fire",
+        #              "Delivery of silver arrived in a silver truck",
+        #              "Shipment of gold arrived in a truck"]
+
+        # 训练lda模型
+        K = 2 # number of topics
+        lda_model, _, _,corpus_tf, _ = get_lda_model(documents, 50,stopword )
+
+        # 计算语聊相似度
+        lda_similarity_matrix = lda_similarity_corpus( corpus_tf, lda_model )
+
+        # 保存结果
+        save_similarity_matrix( lda_similarity_matrix, OUTPUT_PATH )
+        return lda_similarity_matrix
+
+    except Exception as e:
+        print(traceback.print_exc())
+
+def main(document):
+    INPUT_PATH = "/data/python_pj6/bigdata"
+    data = pd.read_csv(INPUT_PATH)
+    stopword = [line.strip() for line in open('/data/python_pj6/china_stopword').readlines()]  # 加载停用词
+    frames=[document,data]
+    df = pd.concat(frames)
+    # print(df)
+    similiry=train(df.岗位描述, stopword)
+    for index,simi in enumerate(similiry[0]):
+        if simi>0.99:
+            print(data[index:index+1][['工作名称','公司名称','岗位描述']])
+            # print(index,'---',simi)
+
+
+test_data=pd.read_csv('/data/python_pj6/test_data')
+main(test_data)
+ 
